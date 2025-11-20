@@ -4,6 +4,7 @@ use chrono::Utc;
 use egui_plot::{Line, PlotPoint};
 use log::info;
 use schili_api::api;
+use serde::{Deserialize, Serialize};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -15,7 +16,7 @@ pub struct TemplateApp {
     #[serde(skip)] // This how you opt-out of serialization of a field
     value: f32,
 
-    sensor_ref: String,
+    sensor_search_form: SensorDataSearchForm,
     sensor_temps: Option<api::SensorTempMeasurements>,
     #[serde(skip)]
     sensor_temps_plot_points: Vec<PlotPoint>,
@@ -33,7 +34,7 @@ impl Default for TemplateApp {
             // Example stuff:
             label: "Hello World!".to_owned(),
             value: 2.7,
-            sensor_ref: String::from("bme280_1"),
+            sensor_search_form: Default::default(),
             sensor_temps: None,
             sensor_temps_plot_points: Vec::new(),
             sensor_temps_sc: sc,
@@ -107,13 +108,13 @@ impl eframe::App for TemplateApp {
 
             ui.separator();
 
-            ui.columns(2, |cols |{
+            ui.columns(2, |cols| {
                 cols[0].vertical(|ui| {
-                        display_sensor_data(ui, self, false);
-                    });
+                    display_sensor_data(ui, self, false);
+                });
                 cols[1].vertical(|ui| {
-                        display_sensor_data_plot(ui, self);
-                    });
+                    display_sensor_data_plot(ui, self);
+                });
             });
         });
 
@@ -150,22 +151,86 @@ fn powered_by_egui_and_eframe(ui: &mut egui::Ui) {
     });
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+struct SensorDataSearchForm {
+    sensor_ref: String,
+    start_datetime_str: String,
+    end_datetime_str: String,
+}
+
+impl SensorDataSearchForm {
+    fn new() -> Self {
+        Self {
+            ..Default::default()
+        }
+    }
+}
+
+impl Default for SensorDataSearchForm {
+    fn default() -> Self {
+        Self {
+            sensor_ref: String::new(),
+            start_datetime_str: String::new(),
+            end_datetime_str: String::new(),
+        }
+    }
+}
+
 fn display_get_sensor_data_ui(ui: &mut egui::Ui, app: &mut TemplateApp) {
     ui.horizontal(|ui| {
-        ui.text_edit_singleline(&mut app.sensor_ref);
-        if ui.button("Fetch Temperature Data").clicked() {
-            send_temps_get_request(app);
-        }
+        ui.label("Sensor Reference");
+        ui.text_edit_singleline(&mut app.sensor_search_form.sensor_ref);
     });
+    ui.horizontal(|ui| {
+        ui.label("Start Datetime");
+        ui.text_edit_singleline(&mut app.sensor_search_form.start_datetime_str);
+    });
+    ui.horizontal(|ui| {
+        ui.label("End Datetime");
+        ui.text_edit_singleline(&mut app.sensor_search_form.end_datetime_str);
+    });
+    if ui.button("Fetch Temperature Data").clicked() {
+        send_temps_get_request(app);
+    }
 }
 
 fn send_temps_get_request(app: &mut TemplateApp) {
+    let start_dt = chrono::NaiveDateTime::parse_from_str(
+        &app.sensor_search_form.start_datetime_str,
+        "%Y-%m-%d %H:%M:%S",
+    );
+    let end_dt = chrono::NaiveDateTime::parse_from_str(
+        &app.sensor_search_form.end_datetime_str,
+        "%Y-%m-%d %H:%M:%S",
+    );
+    match (start_dt, end_dt) {
+        (Ok(start_dt), Ok(end_dt)) =>  {
+        get_temps_in_range(app, start_dt.and_utc(), end_dt.and_utc());
+        }
+        (st, end) => {
+            if let Err(st) = st{
+                println!("error start datetime parsing: {st}");
+            }
+            if let Err(end) = end{
+                println!("error end datetime parsing: {end}");
+            }
+        }
+    }
+}
+
+fn get_temps_in_range(
+    app: &mut TemplateApp,
+    start_dt: chrono::DateTime<Utc>,
+    end_dt: chrono::DateTime<Utc>,
+) {
     let request = ehttp::Request::get(format!(
-        "http://localhost:8080/sensor/temperature/{}",
-        &app.sensor_ref
+        "http://localhost:8080/sensor/temperature/range/{}/{}/{}",
+        &app.sensor_search_form.sensor_ref,
+        start_dt.timestamp(),
+        end_dt.timestamp()
     ));
     let mp = app.sensor_temps_mp.clone();
-    app.waiting_for_data = true; 
+    app.waiting_for_data = true;
     ehttp::fetch(request, move |result: ehttp::Result<ehttp::Response>| {
         info!("fetching temp data");
         if let Ok(result) = result {
@@ -187,15 +252,14 @@ fn display_sensor_data(ui: &mut egui::Ui, app: &mut TemplateApp, auto_shrink: bo
     if app.waiting_for_data {
         if let Ok(temps) = app.sensor_temps_sc.try_recv() {
             app.sensor_temps = temps;
-            app.waiting_for_data = false; 
+            app.waiting_for_data = false;
 
-            if let Some(temps) = &mut app.sensor_temps{
-                temps.temp_measurements.sort_by(
-                    |t1, t2| 
-                    t1.measure_time.cmp(&t2.measure_time).reverse());
+            if let Some(temps) = &mut app.sensor_temps {
+                temps
+                    .temp_measurements
+                    .sort_by(|t1, t2| t1.measure_time.cmp(&t2.measure_time).reverse());
             }
-        }
-        else{
+        } else {
             ui.spinner();
         }
     }
@@ -218,22 +282,28 @@ fn display_sensor_data(ui: &mut egui::Ui, app: &mut TemplateApp, auto_shrink: bo
     }
 }
 
-fn display_sensor_data_plot(ui: &mut egui::Ui, app: &mut TemplateApp){
-    if let Some(temps) = &app.sensor_temps{
+fn display_sensor_data_plot(ui: &mut egui::Ui, app: &mut TemplateApp) {
+    if let Some(temps) = &app.sensor_temps {
         app.sensor_temps_plot_points.clear();
-        temps.temp_measurements.iter()
-            .map(|t| PlotPoint::new(
+        temps
+            .temp_measurements
+            .iter()
+            .map(|t| {
+                PlotPoint::new(
                     (t.measure_time - chrono::DateTime::UNIX_EPOCH).num_seconds() as f64,
-                    bigdecimal::ToPrimitive::to_f64( &t.temp_celsius).unwrap(), 
-            ))
-            .for_each(|t|{
+                    bigdecimal::ToPrimitive::to_f64(&t.temp_celsius).unwrap(),
+                )
+            })
+            .for_each(|t| {
                 app.sensor_temps_plot_points.push(t);
             });
     }
     egui_plot::Plot::new("sensor_temps_plot")
         .data_aspect(10.0)
-        .show(ui, |plot_ui|{
-            plot_ui.line(Line::new("sensor_temps_plot_lines", &app.sensor_temps_plot_points[..])
-                .name("sensor_temps_plot_lines"));
+        .show(ui, |plot_ui| {
+            plot_ui.line(
+                Line::new("sensor_temps_plot_lines", &app.sensor_temps_plot_points[..])
+                    .name("sensor_temps_plot_lines"),
+            );
         });
 }
