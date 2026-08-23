@@ -1,7 +1,7 @@
 use std::ops::RangeInclusive;
 
 use chrono::Utc;
-use egui_plot::{Axis, AxisHints, Line, PlotPoint};
+use egui_plot::{AxisHints, Line, PlotPoint};
 
 use crate::{SchiliApp, model::get_sensor_type_color};
 
