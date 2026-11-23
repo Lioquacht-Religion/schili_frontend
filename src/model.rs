@@ -3,7 +3,7 @@ use std::sync::mpsc;
 use chrono::TimeDelta;
 use egui::{Color32, ahash::HashMap};
 use egui_plot::PlotPoint;
-use schili_api::api::{Sensor, SensorSimpleMeasurements, SensorType, SimpleMeasurement};
+use schili_api::api::{SensorSimpleMeasurements, SensorType, SensorWithTypes, SimpleMeasurement};
 use serde::{Deserialize, Serialize};
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -88,7 +88,7 @@ pub struct SensorsDisplayData {
 
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct SensorData {
-    pub sensor: Sensor,
+    pub sensor: SensorWithTypes,
     pub measurements: HashMap<SensorType, SensorMeasureData>,
 }
 
@@ -102,7 +102,7 @@ pub struct SensorMeasureData {
 }
 
 impl SensorData {
-    pub fn new(sensor: Sensor, measurements: HashMap<SensorType, SensorMeasureData>) -> Self {
+    pub fn new(sensor: SensorWithTypes, measurements: HashMap<SensorType, SensorMeasureData>) -> Self {
         Self {
             sensor,
             measurements,

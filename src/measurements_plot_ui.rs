@@ -18,21 +18,26 @@ pub fn display_sensor_data_plot(ui: &mut egui::Ui, app: &mut SchiliApp) {
 
     let label_fmt = |_text: &str, point: &PlotPoint| {
         let ts_seconds = point.x as i64;
-        let ts = chrono::DateTime::<Utc>::from_timestamp_secs(ts_seconds).unwrap();
-        format!(
-            "
-        Temperature: {} grad celsius
-        timestamp: {}
-        ",
-            point.y,
-            ts.format("%Y-%m-%d %H:%M:%S").to_string()
-        )
+        match chrono::DateTime::<Utc>::from_timestamp_secs(ts_seconds){
+            Some(ts) =>
+                format!(
+                    "
+                Temperature: {} grad celsius
+                timestamp: {}
+                ",
+                    point.y,
+                    ts.format("%Y-%m-%d %H:%M:%S").to_string()
+                ),
+            None => "ParseError".to_string(),
+        }
     };
 
     let time_formatter = |mark: egui_plot::GridMark, _range: &RangeInclusive<f64>| {
         let ts_seconds = mark.value as i64;
-        let ts = chrono::DateTime::<Utc>::from_timestamp_secs(ts_seconds).unwrap();
-        ts.format("%Y-%m-%d %H:%M:%S").to_string()
+        match chrono::DateTime::<Utc>::from_timestamp_secs(ts_seconds){
+            Some(ts) => ts.format("%Y-%m-%d %H:%M:%S").to_string(),
+            None => "ParseError".to_string(),
+        }
     };
 
     let celsius_formatter = |mark: egui_plot::GridMark, _range: &RangeInclusive<f64>| {

@@ -1,4 +1,4 @@
-use schili_api::api::Sensor;
+use schili_api::api::SensorWithTypes;
 
 use crate::{measurements_plot_ui::display_sensor_data_plot, model::{DataSearchError, SensorDataSearchForm, SensorsDisplayData, WaitForDataState}, send_requests::get_all_sensors, sensors_ui::{display_get_sensor_data_ui, display_sensors}};
 
@@ -8,7 +8,7 @@ use crate::{measurements_plot_ui::display_sensor_data_plot, model::{DataSearchEr
 pub struct SchiliApp {
     pub sensor_search_form: SensorDataSearchForm,
     pub sensor_data: SensorsDisplayData,
-    pub wait_sensor_data: WaitForDataState<Result<Vec<Sensor>, DataSearchError>>,
+    pub wait_sensor_data: WaitForDataState<Result<Vec<SensorWithTypes>, DataSearchError>>,
 }
 
 impl Default for SchiliApp {

@@ -1,5 +1,5 @@
 use egui::{Color32, ComboBox, ahash::{HashMap, HashMapExt}};
-use schili_api::api::{self};
+use schili_api::api::{self, SensorTrait};
 
 use crate::{model::{DataSearchError, IntervalUnit, SensorData, SensorDataSearchForm, SensorMeasureData, SensorsDisplayData, WaitForDataState, get_sensor_type_short}, send_requests::send_measurements_get_request};
 
@@ -87,7 +87,7 @@ struct Row(usize);
 pub fn display_sensors(
     ui: &mut egui::Ui,
     sensors: &mut Vec<SensorData>,
-    data: &mut WaitForDataState<Result<Vec<api::Sensor>, DataSearchError>>,
+    data: &mut WaitForDataState<Result<Vec<api::SensorWithTypes>, DataSearchError>>,
     error: &mut Option<DataSearchError>,
     auto_shrink: bool,
 ) {
@@ -148,7 +148,7 @@ pub fn display_sensors(
                                         .show(ui, |ui| {
                                             ui.label(format!(
                                                 "Reference: {} | Name: {}",
-                                                sensor.reference, sensor.name
+                                                sensor.get_reference(), sensor.get_name()
                                             ));
                                         })
                                 });

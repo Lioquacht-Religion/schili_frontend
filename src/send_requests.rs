@@ -44,11 +44,11 @@ pub fn send_measurements_get_request(
     }
 }
 
-const API_HOST: &'static str = "http://192.168.2.117:8080";
-//const API_HOST: &'static str = "http://192.168.2.226:8080";
+//const API_HOST: &'static str = "http://192.168.2.117:8080";
+const API_HOST: &'static str = "http://192.168.2.226:8080";
 //"http://localhost:8080";
 
-pub fn get_all_sensors(data: &mut WaitForDataState<Result<Vec<api::Sensor>, DataSearchError>>) {
+pub fn get_all_sensors(data: &mut WaitForDataState<Result<Vec<api::SensorWithTypes>, DataSearchError>>) {
     //#[get("/sensor/all")]
     fetch_data_with_http(data, &format!("{API_HOST}/sensor/all"));
 }
